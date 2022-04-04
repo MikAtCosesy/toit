@@ -24,7 +24,7 @@ ESP32_WIFI_PASSWORD=
 ESP32_PORT=
 ESP32_CHIP=esp32
 HOST=host
-BUILD_TYPE=Release
+BUILD_TYPE=Debug
 
 # The system process is started from its own entry point.
 ESP32_SYSTEM_ENTRY=system/extensions/esp32/boot.toit

@@ -183,7 +183,7 @@ test_blocking myself/int broker/RpcBroker -> none:
   // to process at once.
   test_blocking myself broker (RpcBroker.MAX_TASKS):
     expect.expect_throw DEADLINE_EXCEEDED_ERROR:
-      with_timeout --ms=200:
+      with_timeout --ms=2000:
         test_simple myself
 
   // Check that the max request limit is honored.
@@ -260,7 +260,7 @@ test_sequential myself/int broker/RpcBroker -> none:
 
   // Let the tasks complete.
   tasks.repeat:
-    sleep --ms=10
+    sleep --ms=100
     latches[it].set it * 3
   tasks.repeat: done.down
 
@@ -341,7 +341,7 @@ test_timeouts myself/int broker/RpcBroker --cancel/bool -> none:
 
   // Use 'with_timeout' to trigger the timeout.
   timeout_based/Lambda := :: | index |
-    expect.expect_throw DEADLINE_EXCEEDED_ERROR: with_timeout --ms=10:
+    expect.expect_throw DEADLINE_EXCEEDED_ERROR: with_timeout --ms=100:
       latches[index] = monitor.Latch
       latches[index].set "Unprocessed: $index"
       rpc.invoke myself name index
@@ -357,7 +357,7 @@ test_timeouts myself/int broker/RpcBroker --cancel/bool -> none:
       finally: | is_exception exception |
         expect.expect task.is_canceled
         critical_do: join.set task
-    sleep --ms=10
+    sleep --ms=100
     subtask.cancel
     expect.expect_identical subtask join.get
 
@@ -369,8 +369,8 @@ test_timeouts myself/int broker/RpcBroker --cancel/bool -> none:
     if cancel: sleep_cancel_based.call index
     else: timeout_based.call index
     result := null
-    sleep --ms=10  // Allow the RPC tasks to reach their blocking point.
-    with_timeout --ms=100: result = latches[index].get
+    sleep --ms=100  // Allow the RPC tasks to reach their blocking point.
+    with_timeout --ms=1000: result = latches[index].get
     latches.remove index
     if result == "Unprocessed: $index":
       unprocessed++
@@ -420,17 +420,17 @@ test_ensure_processing_task myself/int broker/RpcBroker -> none:
   // Block all processing tasks one-by-one, but cancel them after a little while.
   RpcBroker.MAX_TASKS.repeat:
     expect.expect_throw DEADLINE_EXCEEDED_ERROR:
-      with_timeout --ms=50: rpc.invoke myself name []
-  with_timeout --ms=200: test myself 42
+      with_timeout --ms=500: rpc.invoke myself name []
+  with_timeout --ms=2000: test myself 42
 
   // Block all processing tasks at once, but cancel them after a little while.
   done := monitor.Semaphore
   RpcBroker.MAX_TASKS.repeat:
     task::
       expect.expect_throw DEADLINE_EXCEEDED_ERROR:
-        with_timeout --ms=50: rpc.invoke myself name []
+        with_timeout --ms=500: rpc.invoke myself name []
       done.up
-  with_timeout --ms=200: test myself 87
+  with_timeout --ms=2000: test myself 87
   RpcBroker.MAX_TASKS.repeat: done.down
 
   // Unregister procedure and make sure it's gone.
@@ -460,14 +460,14 @@ test_terminate myself/int broker/TestBroker n/int -> none:
   done := monitor.Semaphore
   n.repeat: task::
     try:
-      exception := catch: with_timeout --ms=200: rpc.invoke myself name []
+      exception := catch: with_timeout --ms=2000: rpc.invoke myself name []
       expect.expect (task.is_canceled or exception == DEADLINE_EXCEEDED_ERROR)
     finally:
       critical_do: done.up
 
   // Wait a bit and check that all the requests have been enqueued. It is
   // hard to know exactly how long that takes and we get no signals back.
-  sleep --ms=20
+  sleep --ms=200
   expect.expect_equals n broker.queue_.unprocessed_
 
   // Terminate and wait for the client tasks to stop.
@@ -478,7 +478,7 @@ test_terminate myself/int broker/TestBroker n/int -> none:
   // bit. The waiting time might not be stricly necessary because after
   // all we know that the client tasks have gotten very close to their
   // termination point.
-  sleep --ms=20
+  sleep --ms=200
   expect.expect_equals 0 broker.queue_.unprocessed_
   expect.expect_null broker.queue_.first_
   expect.expect_null broker.queue_.last_
@@ -488,7 +488,7 @@ test_terminate myself/int broker/TestBroker n/int -> none:
   finished := monitor.Latch
   dead := task::
     expect.expect_throw DEADLINE_EXCEEDED_ERROR:
-      with_timeout --ms=100: test myself 99
+      with_timeout --ms=1000: test myself 99
     finished.set task
   expect.expect_identical dead finished.get
 

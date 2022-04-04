@@ -245,6 +245,7 @@ class RememberedSetRebuilder : public HeapObjectVisitor {
   RememberedSetRebuilder(Program* program) : HeapObjectVisitor(program) {}
 
   virtual uword visit(HeapObject* object) override {
+    printf("Remembered set rebuilder object (%s) at %p\n", object->tag_name(), object);
     pointer_callback.found = false;
     object->roots_do(program_, &pointer_callback);
     if (pointer_callback.found) {
@@ -287,6 +288,7 @@ void OldSpace::visit_remembered_set(ScavengeVisitor* visitor) {
       }
       uint8* byte = reinterpret_cast<uint8*>(bytes);
       if (*byte != GcMetadata::NO_NEW_SPACE_POINTERS) {
+        printf("Remembered set object found somewhere near %p\n", (void*)current);
         uint8* starts = GcMetadata::starts_for(current);
         // Since there is a dirty object starting in this card, we would like
         // to assert that there is an object starting in this card.
@@ -310,20 +312,25 @@ void OldSpace::visit_remembered_set(ScavengeVisitor* visitor) {
           } while (iteration_start > earliest_iteration_start &&
                    *starts == GcMetadata::NO_OBJECT_START);
 
+          printf("Stepped back to %p to iterate objects\n", (void*)iteration_start);
           if (iteration_start > earliest_iteration_start) {
             uint8 iteration_low_byte = static_cast<uint8>(iteration_start);
+            ASSERT(iteration_low_byte == 0);
             iteration_start -= iteration_low_byte;
             iteration_start += *starts;
+            printf("Used starts array to find an object that starts at %p\n", (void*)iteration_start);
           } else {
             // Do not step back to before the end of an object that we already
             // scanned. This is both for efficiency, and also to avoid backing
             // into a PromotedTrack object, which contains newly allocated
             // objects inside it, which are not yet traversable.
             iteration_start = earliest_iteration_start;
+            printf("We previously scanned up to %p\n", (void*)iteration_start);
           }
         }
         // Skip objects that start in the previous card.
         while (iteration_start < current) {
+          printf("%p is in previous card, skipping...\n", (void*)iteration_start);
           if (has_sentinel_at(iteration_start)) break;
           HeapObject* object = HeapObject::from_address(iteration_start);
           iteration_start += object->size(program_);
@@ -335,6 +342,8 @@ void OldSpace::visit_remembered_set(ScavengeVisitor* visitor) {
         while (iteration_start < current + GcMetadata::CARD_SIZE) {
           if (has_sentinel_at(iteration_start)) break;
           HeapObject* object = HeapObject::from_address(iteration_start);
+          printf("Scanning object (%s) at %p-%p for new-space pointers\n", object->tag_name(), (void*)iteration_start, (char*)iteration_start + object->size(program_));
+          fflush(stdout);
           object->roots_do(program_, visitor);
           iteration_start += object->size(program_);
         }

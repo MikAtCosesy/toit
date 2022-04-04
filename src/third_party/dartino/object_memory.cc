@@ -274,6 +274,7 @@ Chunk* ObjectMemory::allocate_chunk(Space* owner, uword size) {
 void Chunk::set_owner(Space* value) {
   owner_ = value;
   GcMetadata::mark_pages_for_chunk(this, value->page_type());
+  printf("Chunk appended to %d space: %p-%p\n", value->page_type(), (void*)start(), (void*)(end() - 1));
 }
 
 void ObjectMemory::free_chunk(Chunk* chunk) {
